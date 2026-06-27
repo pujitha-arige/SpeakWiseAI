@@ -1,0 +1,6 @@
+{
+  "name": "SpeakWise AI",
+  "description": "An AI-powered Session Planning and Speaker Coaching Platform featuring dynamic lesson plan generation, live microphone-based speaker coaching, dynamic speech analytics, and profile management.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
