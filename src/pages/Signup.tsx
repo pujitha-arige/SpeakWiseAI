@@ -61,7 +61,16 @@ export const Signup: React.FC<SignupProps> = ({ onNavigate }) => {
         })
       });
 
-      const data = await res.json();
+      let data;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        console.error('Received non-JSON response from server:', text);
+        throw new Error(`Server returned an invalid response. Raw output: ${text.substring(0, 100)}...`);
+      }
+
       if (!res.ok) {
         throw new Error(data.error || 'Failed to sign up.');
       }

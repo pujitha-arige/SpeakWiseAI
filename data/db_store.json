@@ -49,6 +49,28 @@
       "verificationCode": "",
       "createdAt": "2026-06-27T15:19:22.829Z",
       "updatedAt": "2026-06-27T15:20:07.833Z"
+    },
+    {
+      "_id": "user-1m7wlxn66",
+      "email": "tester3@speakwise.ai",
+      "passwordHash": "$2b$10$jjl03E990hC1lthqsGpHe.a8a.cz7Gkxyp7YaZ8DSpW4MY.AdApuS",
+      "name": "Tester3",
+      "bio": "",
+      "occupation": "",
+      "experience": "",
+      "skills": [],
+      "socialLinks": {
+        "website": "",
+        "linkedin": "",
+        "twitter": "",
+        "github": ""
+      },
+      "profilePic": "",
+      "coverImage": "",
+      "isVerified": false,
+      "verificationCode": "582026",
+      "createdAt": "2026-06-27T16:54:17.366Z",
+      "updatedAt": "2026-06-27T16:54:17.366Z"
     }
   ],
   "sessions": [
@@ -233,6 +255,13 @@
       "subject": "Confirm your SpeakWise AI Account",
       "body": "\n          <div style=\"font-family: sans-serif; padding: 24px; max-width: 600px; color: #334155; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 20px; background: #ffffff;\">\n            <div style=\"font-size: 24px; font-weight: bold; background: linear-gradient(135deg, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px;\">SpeakWise AI</div>\n            <h2 style=\"font-size: 18px; color: #1e293b; margin-top: 0;\">Confirm your Email Address</h2>\n            <p>Hello <strong>Pujitha</strong>,</p>\n            <p>Thank you for registering at SpeakWise AI! To activate your account, please enter the following 6-digit security code on the email verification screen:</p>\n            <div style=\"background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 32px; font-weight: bold; letter-spacing: 6px; text-align: center; padding: 16px; border-radius: 12px; margin: 24px 0; color: #4f46e5; font-family: monospace;\">\n              512080\n            </div>\n            <p>This code will expire in 15 minutes. If you did not request this registration, you can safely ignore this email.</p>\n            <hr style=\"border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;\" />\n            <p style=\"font-size: 11px; color: #94a3b8; text-align: center;\">© 2026 SpeakWise AI • The Smart Visual Speaker Coach</p>\n          </div>\n        ",
       "sentAt": "2026-06-27T15:19:22.832Z"
+    },
+    {
+      "_id": "email-yf2qhglnz",
+      "to": "tester3@speakwise.ai",
+      "subject": "Confirm your SpeakWise AI Account",
+      "body": "\n          <div style=\"font-family: sans-serif; padding: 24px; max-width: 600px; color: #334155; line-height: 1.6; border: 1px solid #e2e8f0; border-radius: 20px; background: #ffffff;\">\n            <div style=\"font-size: 24px; font-weight: bold; background: linear-gradient(135deg, #6366f1, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px;\">SpeakWise AI</div>\n            <h2 style=\"font-size: 18px; color: #1e293b; margin-top: 0;\">Confirm your Email Address</h2>\n            <p>Hello <strong>Tester3</strong>,</p>\n            <p>Thank you for registering at SpeakWise AI! To activate your account, please enter the following 6-digit security code on the email verification screen:</p>\n            <div style=\"background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 32px; font-weight: bold; letter-spacing: 6px; text-align: center; padding: 16px; border-radius: 12px; margin: 24px 0; color: #4f46e5; font-family: monospace;\">\n              582026\n            </div>\n            <p>This code will expire in 15 minutes. If you did not request this registration, you can safely ignore this email.</p>\n            <hr style=\"border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;\" />\n            <p style=\"font-size: 11px; color: #94a3b8; text-align: center;\">© 2026 SpeakWise AI • The Smart Visual Speaker Coach</p>\n          </div>\n        ",
+      "sentAt": "2026-06-27T16:54:17.371Z"
     }
   ]
 }
