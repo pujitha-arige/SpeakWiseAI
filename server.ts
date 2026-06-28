@@ -5,7 +5,6 @@
 
 import express from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { connectDB, db } from './server/db.js';
 import { authController, authenticateJWT, AuthenticatedRequest } from './server/auth.js';
 import { generateSessionPlan, evaluatePracticeSpeech, generateStoryAndAnalogy, evaluateQAResponse, analyzeSlides, detectKnowledgeGap } from './server/ai.js';
@@ -535,13 +534,14 @@ export async function initApp() {
     }
   });
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (process.env.VERCEL !== '1') {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
