@@ -72,7 +72,9 @@ export const authController = {
       }
 
       // Check if email already exists
-      const existingUser = await db.users.findOne({ email });
+      const { data: existingUser, error: findError } = await db.from('users').select('*').eq('email', email).maybeSingle();
+      if (findError) throw findError;
+
       if (existingUser) {
         res.status(400).json({ error: 'A user with this email address already exists.' });
         return;
@@ -90,7 +92,7 @@ export const authController = {
       }
 
       // Create new user
-      const newUser = await db.users.create({
+      const { data: newUser, error: insertError } = await db.from('users').insert({
         email,
         passwordHash,
         name,
@@ -98,18 +100,20 @@ export const authController = {
         occupation: occupation || '',
         experience: experience || '',
         skills: skillsArray,
-        profilePic: '',
-        coverImage: '',
         socialLinks: {
           website: '',
           linkedin: '',
           twitter: '',
           github: ''
-        }
-      });
+        },
+        profilePic: '',
+        coverImage: ''
+      }).select().single();
+
+      if (insertError) throw insertError;
 
       // Create a welcome notification
-      await db.notifications.create({
+      await db.from('notifications').insert({
         userId: newUser._id,
         title: 'Account Created Successfully!',
         message: `Welcome to SpeakWise AI, ${newUser.name}! Let's generate a session plan or record your speech in our coaching demo page.`,
@@ -144,7 +148,9 @@ export const authController = {
       }
 
       // Find user
-      const user = await db.users.findOne({ email });
+      const { data: user, error: findError } = await db.from('users').select('*').eq('email', email).maybeSingle();
+      if (findError) throw findError;
+
       if (!user || !user.passwordHash) {
         res.status(401).json({ error: 'Invalid email or password.' });
         return;
@@ -182,7 +188,9 @@ export const authController = {
         return;
       }
 
-      const user = await db.users.findOne({ email });
+      const { data: user, error: findError } = await db.from('users').select('*').eq('email', email).maybeSingle();
+      if (findError) throw findError;
+
       if (!user) {
         // Obfuscate response for privacy, but simulate success
         res.json({
@@ -223,7 +231,9 @@ export const authController = {
       }
 
       const userId = decoded.userId;
-      const user = await db.users.findOne({ _id: userId });
+      const { data: user, error: findError } = await db.from('users').select('*').eq('_id', userId).maybeSingle();
+      if (findError) throw findError;
+
       if (!user) {
         res.status(404).json({ error: 'User not found.' });
         return;
@@ -231,10 +241,11 @@ export const authController = {
 
       // Hash new password
       const newPasswordHash = await bcrypt.hash(newPassword, 10);
-      await db.users.findByIdAndUpdate(userId, { passwordHash: newPasswordHash });
+      const { error: updateError } = await db.from('users').update({ passwordHash: newPasswordHash }).eq('_id', userId);
+      if (updateError) throw updateError;
 
       // Create notification
-      await db.notifications.create({
+      await db.from('notifications').insert({
         userId: user._id,
         title: 'Password Updated',
         message: 'Your password was changed successfully. If this wasn\'t you, please secure your account.',
@@ -255,7 +266,9 @@ export const authController = {
         return;
       }
 
-      const user = await db.users.findOne({ _id: userId });
+      const { data: user, error: findError } = await db.from('users').select('*').eq('_id', userId).maybeSingle();
+      if (findError) throw findError;
+
       if (!user) {
         res.status(404).json({ error: 'User profile not found.' });
         return;

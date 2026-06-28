@@ -13,44 +13,33 @@ import { generateSessionPlan, evaluatePracticeSpeech, generateStoryAndAnalogy, e
 export const app = express();
 
 export async function initApp() {
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
-  // Initialize Database (MongoDB Atlas Mongoose or JSON file-based fallback)
   await connectDB();
 
-  // Middleware for large payloads (profile pics, files, audio data as base64)
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-  // Basic API Status Health Check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', database: 'ready', time: new Date().toISOString() });
   });
 
-  // ==========================================
-  // AUTHENTICATION ROUTES
-  // ==========================================
   app.post('/api/auth/signup', authController.signup);
   app.post('/api/auth/login', authController.login);
   app.post('/api/auth/forgot-password', authController.forgotPassword);
   app.post('/api/auth/reset-password', authController.resetPassword);
   app.get('/api/auth/me', authenticateJWT as any, authController.getMe as any);
 
-  // ==========================================
-  // PLANNED SESSIONS MODULE CRUD & AI GEN
-  // ==========================================
-  
-  // Get all planned sessions for the logged-in user
   app.get('/api/sessions', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      const list = await db.sessions.find({ userId: req.user!.userId });
+      const { data: list, error } = await db.from('sessions').select('*').eq('userId', req.user!.userId);
+      if (error) throw error;
       res.json(list);
     } catch (err) {
       res.status(500).json({ error: 'Error fetching planned sessions.' });
     }
   });
 
-  // Plan New Session & Automatically generate AI Plan
   app.post('/api/sessions', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
       const sessionData = req.body;
@@ -59,7 +48,6 @@ export async function initApp() {
         return;
       }
 
-      // Generate AI Content automatically during creation
       console.log(`Generating AI Lesson Plan for: ${sessionData.sessionName}`);
       let generatedPlan = null;
       try {
@@ -68,16 +56,16 @@ export async function initApp() {
         console.error('AI plan generation error, continuing with empty plan:', e);
       }
 
-      const newSession = await db.sessions.create({
+      const { data: newSession, error: createError } = await db.from('sessions').insert({
         ...sessionData,
         userId: req.user!.userId,
         aiPlan: generatedPlan || undefined
-      });
+      }).select().single();
+      if (createError) throw createError;
 
-      // Add simple upcoming session automatically if date is in the future
       const today = new Date().toISOString().split('T')[0];
       if (sessionData.date && sessionData.date >= today) {
-        await db.upcomingSessions.create({
+        await db.from('upcoming_sessions').insert({
           userId: req.user!.userId,
           title: sessionData.sessionName,
           topic: sessionData.topicName,
@@ -88,8 +76,7 @@ export async function initApp() {
         });
       }
 
-      // Record notification
-      await db.notifications.create({
+      await db.from('notifications').insert({
         userId: req.user!.userId,
         title: 'New Session Planned',
         message: `"${newSession.sessionName}" has been successfully planned with a complete AI timeline.`,
@@ -106,10 +93,10 @@ export async function initApp() {
     }
   });
 
-  // Get specific session
   app.get('/api/sessions/:id', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      const session = await db.sessions.findById(req.params.id);
+      const { data: session, error } = await db.from('sessions').select('*').eq('_id', req.params.id).maybeSingle();
+      if (error) throw error;
       if (!session || session.userId !== req.user!.userId) {
         res.status(404).json({ error: 'Session not found or unauthorized.' });
         return;
@@ -120,26 +107,27 @@ export async function initApp() {
     }
   });
 
-  // Update session
   app.put('/api/sessions/:id', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      const existing = await db.sessions.findById(req.params.id);
+      const { data: existing, error } = await db.from('sessions').select('*').eq('_id', req.params.id).maybeSingle();
+      if (error) throw error;
       if (!existing || existing.userId !== req.user!.userId) {
         res.status(404).json({ error: 'Session not found.' });
         return;
       }
 
-      const updated = await db.sessions.findByIdAndUpdate(req.params.id, req.body);
+      const { data: updated, error: updateError } = await db.from('sessions').update(req.body).eq('_id', req.params.id).select().single();
+      if (updateError) throw updateError;
       res.json({ message: 'Session updated successfully.', session: updated });
     } catch (err) {
       res.status(500).json({ error: 'Error updating session.' });
     }
   });
 
-  // Regenerate/generate AI Lesson Plan for an existing session
   app.post('/api/sessions/:id/generate-plan', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      const session = await db.sessions.findById(req.params.id);
+      const { data: session, error } = await db.from('sessions').select('*').eq('_id', req.params.id).maybeSingle();
+      if (error) throw error;
       if (!session || session.userId !== req.user!.userId) {
         res.status(404).json({ error: 'Session not found.' });
         return;
@@ -148,7 +136,8 @@ export async function initApp() {
       console.log(`Explicitly regenerating plan for: ${session.sessionName}`);
       const aiPlan = await generateSessionPlan(session);
       
-      const updated = await db.sessions.findByIdAndUpdate(req.params.id, { aiPlan });
+      const { data: updated, error: updateError } = await db.from('sessions').update({ aiPlan }).eq('_id', req.params.id).select().single();
+      if (updateError) throw updateError;
       res.json({
         message: 'AI Lesson Plan successfully generated.',
         aiPlan,
@@ -159,28 +148,27 @@ export async function initApp() {
     }
   });
 
-  // Delete session
   app.delete('/api/sessions/:id', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      const session = await db.sessions.findById(req.params.id);
+      const { data: session, error } = await db.from('sessions').select('*').eq('_id', req.params.id).maybeSingle();
+      if (error) throw error;
       if (!session || session.userId !== req.user!.userId) {
         res.status(404).json({ error: 'Session not found.' });
         return;
       }
 
-      await db.sessions.findByIdAndDelete(req.params.id);
+      const { error: deleteError } = await db.from('sessions').delete().eq('_id', req.params.id);
+      if (deleteError) throw deleteError;
       res.json({ message: 'Session planner card deleted successfully.' });
     } catch (err) {
       res.status(500).json({ error: 'Error deleting session.' });
     }
   });
 
-  // ==========================================
-  // UPCOMING SESSIONS CALENDAR/LIST MODULE
-  // ==========================================
   app.get('/api/upcoming-sessions', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      const list = await db.upcomingSessions.find({ userId: req.user!.userId });
+      const { data: list, error } = await db.from('upcoming_sessions').select('*').eq('userId', req.user!.userId);
+      if (error) throw error;
       res.json(list);
     } catch (err) {
       res.status(500).json({ error: 'Error loading upcoming sessions.' });
@@ -195,7 +183,7 @@ export async function initApp() {
         return;
       }
 
-      const event = await db.upcomingSessions.create({
+      const { data: event, error } = await db.from('upcoming_sessions').insert({
         userId: req.user!.userId,
         title,
         topic: topic || '',
@@ -203,7 +191,8 @@ export async function initApp() {
         time,
         duration: Number(duration || 30),
         description: description || ''
-      });
+      }).select().single();
+      if (error) throw error;
 
       res.status(201).json({ message: 'Upcoming calendar event created successfully.', session: event });
     } catch (err) {
@@ -213,7 +202,8 @@ export async function initApp() {
 
   app.put('/api/upcoming-sessions/:id', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      const existing = await db.upcomingSessions.findByIdAndUpdate(req.params.id, req.body);
+      const { data: existing, error } = await db.from('upcoming_sessions').update(req.body).eq('_id', req.params.id).select().single();
+      if (error) throw error;
       res.json({ message: 'Event updated successfully.', event: existing });
     } catch (err) {
       res.status(500).json({ error: 'Error updating event.' });
@@ -222,19 +212,18 @@ export async function initApp() {
 
   app.delete('/api/upcoming-sessions/:id', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      await db.upcomingSessions.findByIdAndDelete(req.params.id);
+      const { error } = await db.from('upcoming_sessions').delete().eq('_id', req.params.id);
+      if (error) throw error;
       res.json({ message: 'Upcoming event deleted.' });
     } catch (err) {
       res.status(500).json({ error: 'Error deleting upcoming event.' });
     }
   });
 
-  // ==========================================
-  // AI PRACTICE SPEAKER DEMO EVALUATION
-  // ==========================================
   app.get('/api/evaluations', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      const evaluations = await db.practiceEvaluations.find({ userId: req.user!.userId });
+      const { data: evaluations, error } = await db.from('practice_evaluations').select('*').eq('userId', req.user!.userId);
+      if (error) throw error;
       res.json(evaluations);
     } catch (err) {
       res.status(500).json({ error: 'Error loading practice logs.' });
@@ -252,15 +241,15 @@ export async function initApp() {
       console.log(`Evaluating speech transcript for topic: ${sessionTitle}`);
       const evaluationResult = await evaluatePracticeSpeech(transcript, sessionTitle);
 
-      const createdEvaluation = await db.practiceEvaluations.create({
+      const { data: createdEvaluation, error } = await db.from('practice_evaluations').insert({
         ...evaluationResult,
         userId: req.user!.userId,
         sessionId: sessionId || '',
         durationSeconds: Number(durationSeconds || evaluationResult.durationSeconds || 30)
-      });
+      }).select().single();
+      if (error) throw error;
 
-      // Notify the user of completed coaching evaluation
-      await db.notifications.create({
+      await db.from('notifications').insert({
         userId: req.user!.userId,
         title: 'Speaker Practice Evaluated',
         message: `Your speech report for "${sessionTitle}" is ready! Final Coaching Score: ${createdEvaluation.overallScore}/100.`,
@@ -279,19 +268,18 @@ export async function initApp() {
 
   app.delete('/api/evaluations/:id', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      await db.practiceEvaluations.findByIdAndDelete(req.params.id);
+      const { error } = await db.from('practice_evaluations').delete().eq('_id', req.params.id);
+      if (error) throw error;
       res.json({ message: 'Practice evaluation report removed.' });
     } catch (err) {
       res.status(500).json({ error: 'Error removing evaluation.' });
     }
   });
 
-  // ==========================================
-  // NOTIFICATIONS HISTORY ENDPOINTS
-  // ==========================================
   app.get('/api/notifications', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      const list = await db.notifications.find({ userId: req.user!.userId });
+      const { data: list, error } = await db.from('notifications').select('*').eq('userId', req.user!.userId);
+      if (error) throw error;
       res.json(list);
     } catch (err) {
       res.status(500).json({ error: 'Error loading notification log.' });
@@ -300,7 +288,8 @@ export async function initApp() {
 
   app.post('/api/notifications/read-all', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      await db.notifications.markAllAsRead(req.user!.userId);
+      const { error } = await db.from('notifications').update({ read: true }).eq('userId', req.user!.userId);
+      if (error) throw error;
       res.json({ message: 'All notifications marked as read.' });
     } catch (err) {
       res.status(500).json({ error: 'Error marking logs.' });
@@ -309,22 +298,19 @@ export async function initApp() {
 
   app.delete('/api/notifications/:id', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
-      await db.notifications.delete(req.params.id);
+      const { error } = await db.from('notifications').delete().eq('_id', req.params.id);
+      if (error) throw error;
       res.json({ message: 'Notification deleted.' });
     } catch (err) {
       res.status(500).json({ error: 'Error clearing alert.' });
     }
   });
 
-  // ==========================================
-  // USER PROFILE & SYSTEM CONFIG
-  // ==========================================
   app.put('/api/profile', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user!.userId;
       const updateData = req.body;
 
-      // Filter and clean input to protect system fields
       const cleanUpdate: any = {};
       if (updateData.name) cleanUpdate.name = updateData.name;
       if (updateData.bio !== undefined) cleanUpdate.bio = updateData.bio;
@@ -344,11 +330,11 @@ export async function initApp() {
         };
       }
       
-      // Handles Profile Picture and Cover Images as direct base64 strings
       if (updateData.profilePic !== undefined) cleanUpdate.profilePic = updateData.profilePic;
       if (updateData.coverImage !== undefined) cleanUpdate.coverImage = updateData.coverImage;
 
-      const updatedUser = await db.users.findByIdAndUpdate(userId, cleanUpdate);
+      const { data: updatedUser, error } = await db.from('users').update(cleanUpdate).eq('_id', userId).select().single();
+      if (error) throw error;
       if (!updatedUser) {
         res.status(404).json({ error: 'User profile not found.' });
         return;
@@ -367,36 +353,33 @@ export async function initApp() {
     }
   });
 
-  // ==========================================
-  // SPEECH & PERFORMANCE ANALYTICS
-  // ==========================================
   app.get('/api/analytics', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.user!.userId;
-      const sessions = await db.sessions.find({ userId });
-      const evaluations = await db.practiceEvaluations.find({ userId });
-      const upcoming = await db.upcomingSessions.find({ userId });
+      const { data: sessions, error: e1 } = await db.from('sessions').select('*').eq('userId', userId);
+      const { data: evaluations, error: e2 } = await db.from('practice_evaluations').select('*').eq('userId', userId);
+      const { data: upcoming, error: e3 } = await db.from('upcoming_sessions').select('*').eq('userId', userId);
 
-      // Aggregate Performance Metrics
-      const totalSessions = sessions.length;
-      const totalUpcoming = upcoming.length;
-      const totalCompleted = sessions.filter(s => {
+      if (e1 || e2 || e3) throw new Error('Database fetch error');
+
+      const totalSessions = sessions?.length || 0;
+      const totalUpcoming = upcoming?.length || 0;
+      const totalCompleted = sessions?.filter(s => {
         const sched = new Date(`${s.date} ${s.time}`);
         return sched.getTime() < Date.now();
-      }).length;
-      const totalEvaluations = evaluations.length;
+      }).length || 0;
+      const totalEvaluations = evaluations?.length || 0;
 
-      // Calculate Average AI Scores
       let avgScore = 0;
       let avgConfidence = 0;
       let avgCommunication = 0;
       let avgEngagement = 0;
 
       if (totalEvaluations > 0) {
-        const sumScore = evaluations.reduce((acc, curr) => acc + curr.overallScore, 0);
-        const sumConfidence = evaluations.reduce((acc, curr) => acc + curr.confidenceScore, 0);
-        const sumCommunication = evaluations.reduce((acc, curr) => acc + curr.communicationScore, 0);
-        const sumEngagement = evaluations.reduce((acc, curr) => acc + curr.engagementScore, 0);
+        const sumScore = evaluations!.reduce((acc, curr) => acc + curr.overallScore, 0);
+        const sumConfidence = evaluations!.reduce((acc, curr) => acc + curr.confidenceScore, 0);
+        const sumCommunication = evaluations!.reduce((acc, curr) => acc + curr.communicationScore, 0);
+        const sumEngagement = evaluations!.reduce((acc, curr) => acc + curr.engagementScore, 0);
         
         avgScore = Math.round(sumScore / totalEvaluations);
         avgConfidence = Math.round(sumConfidence / totalEvaluations);
@@ -404,8 +387,7 @@ export async function initApp() {
         avgEngagement = Math.round(sumEngagement / totalEvaluations);
       }
 
-      // Format trends (last 7 evaluations chronological)
-      const performanceTrend = evaluations
+      const performanceTrend = (evaluations || [])
         .slice(0, 7)
         .reverse()
         .map(e => ({
@@ -417,9 +399,8 @@ export async function initApp() {
           engagement: e.engagementScore
         }));
 
-      // Group Sessions by Type for a breakdown chart
       const typeDistributionMap: { [key: string]: number } = {};
-      sessions.forEach(s => {
+      (sessions || []).forEach(s => {
         typeDistributionMap[s.sessionType] = (typeDistributionMap[s.sessionType] || 0) + 1;
       });
       const typeDistribution = Object.entries(typeDistributionMap).map(([name, value]) => ({ name, value }));
@@ -445,17 +426,10 @@ export async function initApp() {
     }
   });
 
-
-  // ==================================================
-  // REAL-TIME SESSION REMINDERS & NOTIFICATION CRON
-  // ==================================================
-  // Run background scan every 45 seconds to check upcoming events, and trigger browser alerts
   setInterval(async () => {
     try {
-      // Find all upcoming sessions
-      // (For JSON DB, we can load all. In real life we filter, but let's load all and filter in memory)
-      const allUpcoming = await db.upcomingSessions.find({ userId: 'demo-user-id' }); // scan default user or check active ones
-      if (allUpcoming.length === 0) return;
+      const { data: allUpcoming, error } = await db.from('upcoming_sessions').select('*').limit(100);
+      if (error || !allUpcoming || allUpcoming.length === 0) return;
 
       const now = new Date();
 
@@ -464,10 +438,9 @@ export async function initApp() {
         const diffMs = eventTime.getTime() - now.getTime();
         const diffMinutes = Math.round(diffMs / (1000 * 60));
 
-        // 1 Day Reminder (1440 mins)
         if (diffMinutes > 1400 && diffMinutes <= 1440 && !event.notifiedOneDay) {
-          await db.upcomingSessions.findByIdAndUpdate(event._id, { notifiedOneDay: true });
-          await db.notifications.create({
+          await db.from('upcoming_sessions').update({ notifiedOneDay: true }).eq('_id', event._id);
+          await db.from('notifications').insert({
             userId: event.userId,
             title: '📅 24-Hour Event Reminder',
             message: `Your upcoming coaching session "${event.title}" starts tomorrow at ${event.time}! Get ready to record.`,
@@ -476,10 +449,9 @@ export async function initApp() {
           console.log(`Notification sent: 1 Day reminder for "${event.title}"`);
         }
 
-        // 1 Hour Reminder (60 mins)
         if (diffMinutes > 50 && diffMinutes <= 60 && !event.notifiedOneHour) {
-          await db.upcomingSessions.findByIdAndUpdate(event._id, { notifiedOneHour: true });
-          await db.notifications.create({
+          await db.from('upcoming_sessions').update({ notifiedOneHour: true }).eq('_id', event._id);
+          await db.from('notifications').insert({
             userId: event.userId,
             title: '⏰ 1-Hour Event Reminder',
             message: `Your session "${event.title}" begins in 1 hour. Grab your notes!`,
@@ -488,10 +460,9 @@ export async function initApp() {
           console.log(`Notification sent: 1 Hour reminder for "${event.title}"`);
         }
 
-        // 10 Minutes Reminder (10 mins)
         if (diffMinutes > 0 && diffMinutes <= 10 && !event.notifiedTenMinutes) {
-          await db.upcomingSessions.findByIdAndUpdate(event._id, { notifiedTenMinutes: true });
-          await db.notifications.create({
+          await db.from('upcoming_sessions').update({ notifiedTenMinutes: true }).eq('_id', event._id);
+          await db.from('notifications').insert({
             userId: event.userId,
             title: '🚨 10-Minute Warning!',
             message: `"${event.title}" is starting in exactly 10 minutes. Set up your microphone now.`,
@@ -501,16 +472,9 @@ export async function initApp() {
         }
       }
     } catch (e) {
-      // quiet catch background scan error
     }
   }, 45000);
 
-
-  // ==========================================
-  // SAAS WORKSPACE AI AGENTIC CAPABILITIES
-  // ==========================================
-
-  // Story & Analogy Generator
   app.post('/api/ai/story-generator', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
       const { topicName, expectedOutcome } = req.body;
@@ -526,7 +490,6 @@ export async function initApp() {
     }
   });
 
-  // Q&A Response Evaluator
   app.post('/api/ai/qa-simulator', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
       const { question, presenterAnswer } = req.body;
@@ -542,7 +505,6 @@ export async function initApp() {
     }
   });
 
-  // Slide Deck Analyzer & Speaker Notes Assistant
   app.post('/api/ai/slide-analyzer', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
       const { slideText } = req.body;
@@ -558,7 +520,6 @@ export async function initApp() {
     }
   });
 
-  // Knowledge Gap Detector
   app.post('/api/ai/knowledge-gap', authenticateJWT as any, async (req: AuthenticatedRequest, res) => {
     try {
       const { transcript, expectedConcepts } = req.body;
@@ -574,10 +535,6 @@ export async function initApp() {
     }
   });
 
-
-  // ==========================================
-  // FRONTEND INTEGRATION
-  // ==========================================
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
