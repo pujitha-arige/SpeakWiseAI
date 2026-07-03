@@ -151,7 +151,7 @@ export const Analytics: React.FC = () => {
           <div>
             <span className="text-[10px] text-slate-400 uppercase font-bold">Avg Overall Competency</span>
             <h3 className="font-display font-extrabold text-2xl text-slate-800 dark:text-white mt-0.5">
-              {stats.averages.overall || 82}%
+              {stats.averages.overall}%
             </h3>
           </div>
         </div>

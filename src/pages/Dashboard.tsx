@@ -145,7 +145,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             Greetings, {user?.name}!
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-xl">
-            You have conducted <span className="font-bold text-indigo-600 dark:text-pink-400">{stats.totalSessions} sessions</span> with an average AI coach confidence score of <span className="font-bold text-indigo-600 dark:text-pink-400">{stats.averages.overall || 82}%</span>. Let's design some impact!
+            You have conducted <span className="font-bold text-indigo-600 dark:text-pink-400">{stats.totalSessions} sessions</span> with an average AI coach confidence score of <span className="font-bold text-indigo-600 dark:text-pink-400">{stats.averages.overall}%</span>. Let's design some impact!
           </p>
         </div>
         <button
@@ -209,7 +209,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <div>
             <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">AI Coach Score</p>
             <h3 className="font-display font-extrabold text-3xl text-slate-800 dark:text-white mt-1">
-              {stats.averages.overall ? `${stats.averages.overall}/100` : '85/100'}
+              {stats.averages.overall}/100
             </h3>
           </div>
           <button onClick={() => onNavigate('#coaching')} className="text-xs font-semibold text-purple-500 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
